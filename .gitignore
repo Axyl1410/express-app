@@ -168,3 +168,4 @@ ecosystem.config.js
 config/local.json
 config/local.js
 config/local.ts
+/src/generated/prisma
