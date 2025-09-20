@@ -1,12 +1,12 @@
 import express, { Router } from "express";
-import bai2 from "./bai2";
-import bai3 from "./bai3";
-import bai4 from "./bai4";
+import authMiddleware from "../../middleware/auth.middleware";
+import greet from "./greet";
+import hello from "./hello";
 
 const v1: Router = express.Router();
 
-v1.use("/bai2", bai2);
-v1.use("/bai3", bai3);
-v1.use("/bai4", bai4);
+v1.use(authMiddleware);
+v1.use("/hello", hello);
+v1.use("/greet", greet);
 
 export default v1;
