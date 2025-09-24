@@ -18,6 +18,8 @@ export const CreateServer = () => {
     res.json({ ok: true, timeStamp: new Date().toISOString() });
   });
 
+  app.use(express.static("public"));
+
   app.use("/v1", v1);
   app.use("/v2", v2);
 
