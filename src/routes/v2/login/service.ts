@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 
 export const getLoginService = (req: Request, res: Response) => {
   const username = req.query.username;

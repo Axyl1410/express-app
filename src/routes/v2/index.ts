@@ -1,4 +1,4 @@
-import express, { Router } from "express";
+import express, { type Router } from "express";
 import filter from "./filter";
 import login from "./login";
 import user from "./user";

@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 
 export const filterService = (req: Request, res: Response) => {
   const productId = req.query.productId;

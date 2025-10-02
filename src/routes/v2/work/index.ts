@@ -1,4 +1,4 @@
-import express, { Router } from "express";
+import express, { type Router } from "express";
 import WorkMiddleware from "../../../middleware/work.middleware";
 import { getWorkService } from "./service";
 
