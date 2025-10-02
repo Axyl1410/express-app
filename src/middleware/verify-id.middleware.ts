@@ -9,7 +9,6 @@ const verifyIdMiddleware = (
 
   if (id?.length !== 13) {
     res.status(400).json({ message: "ID must be 13 characters long" });
-    return;
   }
 
   next();

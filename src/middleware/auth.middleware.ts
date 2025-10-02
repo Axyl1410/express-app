@@ -6,7 +6,6 @@ const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
 
   if (req.query.username !== username || req.query.password !== password) {
     res.status(401).json({ message: "Unauthorized" });
-    return;
   }
 
   next();

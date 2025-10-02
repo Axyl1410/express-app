@@ -11,7 +11,6 @@ const verifyPhoneMiddleware = (
     res.status(400).json({
       message: "Phone number must be 12 characters long and start with 0",
     });
-    return;
   }
 
   next();
