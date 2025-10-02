@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 
 const userMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const userId = req.query?.id;

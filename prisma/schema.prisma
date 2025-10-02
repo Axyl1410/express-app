@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,4 +5,191 @@ generator client {
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
+}
+
+// =========================================================================
+// I. ENUMS (Định nghĩa các loại hằng số)
+// =========================================================================
+
+enum ChatRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// =========================================================================
+// II. AUTHENTICATION & USER MANAGEMENT MODELS
+// =========================================================================
+
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  username      String?   @unique // IMPROVEMENT: Username để @mention
+  bio           String? // IMPROVEMENT: Giới thiệu bản thân
+  lastSeen      DateTime? // IMPROVEMENT: Trạng thái online/offline
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  role       String    @default("user")
+  banned     Boolean?  @default(false)
+  banReason  String?
+  banExpires DateTime?
+
+  // Auth Relations
+  sessions Session[]
+  accounts Account[]
+
+  // Chat Relations
+  membership   ChatMember[] // IMPROVEMENT: Tham gia các chat qua vai trò
+  sentMessages Message[]            @relation("SenderMessages")
+  readReceipts MessageReadReceipt[]
+
+  // Contact Relations (Optional)
+  ownedContacts     Contact[] @relation("OwnedContacts")
+  appearsInContacts Contact[] @relation("AppearsInContacts")
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("session")
+}
+
+model Account {
+  id                   String    @id @default(auto()) @map("_id") @db.ObjectId
+  accountId            String
+  providerId           String
+  accessToken          String?
+  refreshToken         String?
+  accessTokenExpiresAt DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  userId               String    @db.ObjectId
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([providerId, accountId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, value])
+  @@map("verification")
+}
+
+// =========================================================================
+// III. CHAT & MESSAGE MODELS
+// =========================================================================
+
+model Chat {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  name      String?
+  type      String  @default("private") // 'private', 'group', 'channel'
+  chatImage String? // Thêm ảnh đại diện cho group/channel
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+  members  ChatMember[] // IMPROVEMENT: Quản lý thành viên và vai trò
+
+  lastMessageId String?  @unique @db.ObjectId
+  lastMessage   Message? @relation("LastMessage", fields: [lastMessageId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([type])
+  @@map("chat")
+}
+
+model ChatMember {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  role       ChatRole  @default(MEMBER)
+  joinedAt   DateTime  @default(now())
+  mutedUntil DateTime?
+
+  chatId String @db.ObjectId
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([chatId, userId])
+  @@index([userId])
+  @@map("chat_member")
+}
+
+model Message {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  content   String
+  mediaUrl  String?
+  mediaType String?
+
+  createdAt DateTime  @default(now())
+  isEdited  Boolean   @default(false) // IMPROVEMENT: Trạng thái đã chỉnh sửa
+  deletedAt DateTime? // IMPROVEMENT: Hỗ trợ soft-delete
+
+  chatId String @db.ObjectId
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  senderId String @db.ObjectId
+  sender   User   @relation("SenderMessages", fields: [senderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  chatAsLastMessage Chat? @relation("LastMessage")
+
+  // IMPROVEMENT: Reply feature
+  repliedToId String?   @db.ObjectId
+  repliedTo   Message?  @relation("Replies", fields: [repliedToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies     Message[] @relation("Replies")
+
+  // IMPROVEMENT: Read receipts
+  readBy MessageReadReceipt[]
+
+  @@index([chatId, createdAt])
+  @@map("message")
+}
+
+model MessageReadReceipt {
+  id     String   @id @default(auto()) @map("_id") @db.ObjectId
+  readAt DateTime @default(now())
+
+  messageId String  @db.ObjectId
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId    String  @db.ObjectId
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([messageId, userId])
+  @@map("message_read_receipt")
+}
+
+// =========================================================================
+// IV. CONTACTS (Optional)
+// =========================================================================
+
+model Contact {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  ownerId   String   @db.ObjectId
+  owner     User     @relation("OwnedContacts", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  contactId String   @db.ObjectId
+  contact   User     @relation("AppearsInContacts", fields: [contactId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  alias     String?
+  createdAt DateTime @default(now())
+
+  @@unique([ownerId, contactId])
+  @@map("contact")
 }

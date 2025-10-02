@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { patternPassword, patternUsername } from "../utils";
 
 const LoginMiddleware = (req: Request, res: Response, next: NextFunction) => {
