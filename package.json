@@ -8,7 +8,7 @@
     "dev": "nodemon src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "prisma generate",
-    "lint": "biome lint --write"
+    "lint": "biome lint --fix"
   },
   "keywords": [],
   "author": "",
@@ -17,7 +17,8 @@
   "dependencies": {
     "@prisma/client": "^6.16.1",
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.4",
