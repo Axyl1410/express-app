@@ -1,3 +1,10 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// ===============================================
+// KHỐI CÓ SẴN - KHÔNG THAY ĐỔI
+// ===============================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,189 +14,175 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// =========================================================================
-// I. ENUMS (Định nghĩa các loại hằng số)
-// =========================================================================
-
-enum ChatRole {
-  OWNER
-  ADMIN
-  MEMBER
-}
-
-// =========================================================================
-// II. AUTHENTICATION & USER MANAGEMENT MODELS
-// =========================================================================
-
 model User {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  name          String?
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
-  username      String?   @unique // IMPROVEMENT: Username để @mention
-  bio           String? // IMPROVEMENT: Giới thiệu bản thân
-  lastSeen      DateTime? // IMPROVEMENT: Trạng thái online/offline
+  id              String    @id @default(cuid()) @map("_id") // Thay đổi sang cuid() cho an toàn hơn
+  name            String
+  email           String
+  emailVerified   Boolean   @default(false)
+  image           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+  username        String?
+  displayUsername String?
+  sessions        Session[]
+  accounts        Account[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Quan hệ cho chức năng chat
+  conversations ConversationParticipant[]
+  sentMessages  Message[]
+  readReceipts  ReadReceipt[]
+  uploadedMedia Media[]
 
-  role       String    @default("user")
-  banned     Boolean?  @default(false)
-  banReason  String?
-  banExpires DateTime?
-
-  // Auth Relations
-  sessions Session[]
-  accounts Account[]
-
-  // Chat Relations
-  membership   ChatMember[] // IMPROVEMENT: Tham gia các chat qua vai trò
-  sentMessages Message[]            @relation("SenderMessages")
-  readReceipts MessageReadReceipt[]
-
-  // Contact Relations (Optional)
-  ownedContacts     Contact[] @relation("OwnedContacts")
-  appearsInContacts Contact[] @relation("AppearsInContacts")
-
+  @@unique([email])
+  @@unique([username])
   @@map("user")
 }
 
 model Session {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @map("_id")
   expiresAt DateTime
-  token     String   @unique
+  token     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  userId    String   @db.ObjectId
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([token])
   @@map("session")
 }
 
 model Account {
-  id                   String    @id @default(auto()) @map("_id") @db.ObjectId
-  accountId            String
-  providerId           String
-  accessToken          String?
-  refreshToken         String?
-  accessTokenExpiresAt DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  userId               String    @db.ObjectId
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                    String    @id @map("_id")
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  @@unique([providerId, accountId])
   @@map("account")
 }
 
 model Verification {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  id         String   @id @map("_id")
   identifier String
   value      String
   expiresAt  DateTime
   createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  updatedAt  DateTime @default(now()) @updatedAt
 
-  @@unique([identifier, value])
   @@map("verification")
 }
 
-// =========================================================================
-// III. CHAT & MESSAGE MODELS
-// =========================================================================
+// ===============================================
+// KHỐI MỚI - DÀNH CHO CHỨC NĂNG CHAT
+// ===============================================
 
-model Chat {
-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
-  name      String?
-  type      String  @default("private") // 'private', 'group', 'channel'
-  chatImage String? // Thêm ảnh đại diện cho group/channel
+// Enums để định nghĩa các loại và vai trò
+enum ConversationType {
+  PRIVATE
+  GROUP
+}
 
+enum ParticipantRole {
+  MEMBER
+  ADMIN
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  FILE
+}
+
+// Model cho cuộc trò chuyện (1-1 hoặc nhóm)
+model Conversation {
+  id        String           @id @default(cuid()) @map("_id")
+  name      String? // Tên cho group chat
+  imageUrl  String? // Ảnh đại diện cho group chat
+  type      ConversationType @default(PRIVATE)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  // Mối quan hệ
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+// Model trung gian để kết nối User và Conversation (thành viên)
+model ConversationParticipant {
+  id       String          @id @default(cuid()) @map("_id")
+  role     ParticipantRole @default(MEMBER)
+  joinedAt DateTime        @default(now())
+
+  // Mối quan hệ
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conversationId]) // Đảm bảo người dùng không thể tham gia 2 lần
+  @@map("conversation_participants")
+}
+
+// Model cho một tin nhắn
+model Message {
+  id        String   @id @default(cuid()) @map("_id")
+  content   String? // Có thể null nếu chỉ gửi media
+  deleted   Boolean  @default(false) // Để soft delete
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  messages Message[]
-  members  ChatMember[] // IMPROVEMENT: Quản lý thành viên và vai trò
+  // Mối quan hệ
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  lastMessageId String?  @unique @db.ObjectId
-  lastMessage   Message? @relation("LastMessage", fields: [lastMessageId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  media  Media[]
+  readBy ReadReceipt[]
 
-  @@index([type])
-  @@map("chat")
+  @@map("messages")
 }
 
-model ChatMember {
-  id         String    @id @default(auto()) @map("_id") @db.ObjectId
-  role       ChatRole  @default(MEMBER)
-  joinedAt   DateTime  @default(now())
-  mutedUntil DateTime?
-
-  chatId String @db.ObjectId
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  userId String @db.ObjectId
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@unique([chatId, userId])
-  @@index([userId])
-  @@map("chat_member")
-}
-
-model Message {
-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
-  content   String
-  mediaUrl  String?
-  mediaType String?
-
+// Model cho media đính kèm (ảnh, video, file)
+model Media {
+  id        String    @id @default(cuid()) @map("_id")
+  url       String
+  type      MediaType
   createdAt DateTime  @default(now())
-  isEdited  Boolean   @default(false) // IMPROVEMENT: Trạng thái đã chỉnh sửa
-  deletedAt DateTime? // IMPROVEMENT: Hỗ trợ soft-delete
 
-  chatId String @db.ObjectId
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // Mối quan hệ
+  messageId  String
+  message    Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  uploaderId String
+  uploader   User    @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
 
-  senderId String @db.ObjectId
-  sender   User   @relation("SenderMessages", fields: [senderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  chatAsLastMessage Chat? @relation("LastMessage")
-
-  // IMPROVEMENT: Reply feature
-  repliedToId String?   @db.ObjectId
-  repliedTo   Message?  @relation("Replies", fields: [repliedToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  replies     Message[] @relation("Replies")
-
-  // IMPROVEMENT: Read receipts
-  readBy MessageReadReceipt[]
-
-  @@index([chatId, createdAt])
-  @@map("message")
+  @@map("media")
 }
 
-model MessageReadReceipt {
-  id     String   @id @default(auto()) @map("_id") @db.ObjectId
+// Model để theo dõi trạng thái "đã đọc"
+model ReadReceipt {
+  id     String   @id @default(cuid()) @map("_id")
   readAt DateTime @default(now())
 
-  messageId String  @db.ObjectId
-  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  userId    String  @db.ObjectId
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  // Mối quan hệ
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
-  @@unique([messageId, userId])
-  @@map("message_read_receipt")
-}
-
-// =========================================================================
-// IV. CONTACTS (Optional)
-// =========================================================================
-
-model Contact {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  ownerId   String   @db.ObjectId
-  owner     User     @relation("OwnedContacts", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  contactId String   @db.ObjectId
-  contact   User     @relation("AppearsInContacts", fields: [contactId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  alias     String?
-  createdAt DateTime @default(now())
-
-  @@unique([ownerId, contactId])
-  @@map("contact")
+  @@unique([userId, messageId])
+  @@map("read_receipts")
 }

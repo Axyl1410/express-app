@@ -1,3 +1,4 @@
+import { ConversationType } from "@prisma/client";
 import prisma from "../../../prisma-client";
 
 export async function ensureUsersExist(
@@ -15,15 +16,15 @@ export async function findExistingPrivateChat(
   userId: string,
   otherUserId: string
 ) {
-  return prisma.chat.findFirst({
+  return await prisma.conversation.findFirst({
     where: {
-      type: "private",
+      type: ConversationType.PRIVATE,
       AND: [
-        { members: { some: { userId } } },
-        { members: { some: { userId: otherUserId } } },
+        { participants: { some: { userId } } },
+        { participants: { some: { userId: otherUserId } } },
       ],
     },
-    include: { lastMessage: true, members: true },
+    include: { participants: true },
   });
 }
 
@@ -32,63 +33,72 @@ export async function createPrivateChat(
   otherUserId: string,
   name?: string
 ) {
-  const chat = await prisma.chat.create({
-    data: { type: "private", name: name || null },
+  const conversation = await prisma.conversation.create({
+    data: {
+      type: ConversationType.PRIVATE,
+      name: name || null,
+    },
   });
   await Promise.all([
-    prisma.chatMember.upsert({
-      where: { chatId_userId: { chatId: chat.id, userId } },
+    prisma.conversationParticipant.upsert({
+      where: {
+        userId_conversationId: { conversationId: conversation.id, userId },
+      },
       update: {},
-      create: { chatId: chat.id, userId },
+      create: { conversationId: conversation.id, userId },
     }),
-    prisma.chatMember.upsert({
-      where: { chatId_userId: { chatId: chat.id, userId: otherUserId } },
+    prisma.conversationParticipant.upsert({
+      where: {
+        userId_conversationId: {
+          conversationId: conversation.id,
+          userId: otherUserId,
+        },
+      },
       update: {},
-      create: { chatId: chat.id, userId: otherUserId },
+      create: { conversationId: conversation.id, userId: otherUserId },
     }),
   ]);
-  return prisma.chat.findUnique({
-    where: { id: chat.id },
-    include: { members: true, lastMessage: true },
+  return prisma.conversation.findUnique({
+    where: { id: conversation.id },
+    include: { participants: true },
   });
 }
 
 export async function listChats(userId?: string) {
-  return prisma.chat.findMany({
-    where: userId ? { members: { some: { userId } } } : {},
+  return await prisma.conversation.findMany({
+    where: userId ? { participants: { some: { userId } } } : {},
     orderBy: { updatedAt: "desc" },
-    include: { lastMessage: true, members: true },
+    include: { participants: true },
     take: 50,
   });
 }
 
 export async function listMessages(
-  chatId: string,
+  conversationId: string,
   cursor?: string,
   take: number = 30
 ) {
-  return prisma.message.findMany({
-    where: { chatId },
+  return await prisma.message.findMany({
+    where: { conversationId },
     orderBy: { createdAt: "desc" },
     take,
     ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-    include: { sender: true, repliedTo: true },
+    include: { sender: true },
   });
 }
 
 export async function createMessage(
-  chatId: string,
+  conversationId: string,
   senderId: string,
-  content: string,
-  repliedToId?: string
+  content?: string
 ) {
   const message = await prisma.message.create({
-    data: { chatId, senderId, content, repliedToId: repliedToId || null },
-    include: { sender: true, repliedTo: true },
-  });
-  await prisma.chat.update({
-    where: { id: chatId },
-    data: { lastMessageId: message.id, updatedAt: new Date() },
+    data: {
+      conversationId,
+      senderId,
+      content: content ?? null,
+    },
+    include: { sender: true },
   });
   return message;
 }

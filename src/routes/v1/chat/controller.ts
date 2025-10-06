@@ -16,22 +16,27 @@ export async function createPrivateChatController(req: Request, res: Response) {
       otherUserId: string;
       name?: string;
     };
-    if (!userId || !otherUserId)
+    if (!userId || !otherUserId) {
       return res
         .status(400)
         .json({ ok: false, message: "userId and otherUserId required" });
-    if (userId === otherUserId)
+    }
+    if (userId === otherUserId) {
       return res.status(400).json({
         ok: false,
         message: "Cannot create private chat with yourself",
       });
+    }
     const ok = await ensureUsersExist(userId, otherUserId);
-    if (!ok)
+    if (!ok) {
       return res
         .status(404)
         .json({ ok: false, message: "One or both users not found" });
+    }
     const existed = await findExistingPrivateChat(userId, otherUserId);
-    if (existed) return res.json({ ok: true, existed: true, data: existed });
+    if (existed) {
+      return res.json({ ok: true, existed: true, data: existed });
+    }
     const chat = await createPrivateChat(userId, otherUserId, name);
     const io = getIO();
     if (io) {
@@ -74,19 +79,20 @@ export async function listMessagesController(req: Request, res: Response) {
 export async function createMessageController(req: Request, res: Response) {
   try {
     const { chatId } = req.params;
-    const { senderId, content, repliedToId } = req.body as {
+    const { senderId, content } = req.body as {
       senderId: string;
       content: string;
-      repliedToId?: string;
     };
-    if (!senderId || !content)
+    if (!senderId || !content) {
       return res
         .status(400)
         .json({ ok: false, message: "senderId and content required" });
-    const message = await createMessage(chatId, senderId, content, repliedToId);
+    }
+    const message = await createMessage(chatId, senderId, content);
     const io = getIO();
-    if (io)
+    if (io) {
       io.to(`chat:${chatId}`).emit("chat:new-message", { chatId, message });
+    }
     return res.status(201).json({ ok: true, data: message });
   } catch (e) {
     return res
@@ -99,6 +105,8 @@ export function typingController(req: Request, res: Response) {
   const { chatId } = req.params;
   const { userId, typing } = req.body as { userId: string; typing: boolean };
   const io = getIO();
-  if (io) io.to(`chat:${chatId}`).emit("chat:typing", { userId, typing });
+  if (io) {
+    io.to(`chat:${chatId}`).emit("chat:typing", { userId, typing });
+  }
   return res.json({ ok: true });
 }
