@@ -24,7 +24,7 @@ export async function findExistingPrivateChat(
         { participants: { some: { userId: otherUserId } } },
       ],
     },
-    include: { participants: true },
+    include: { participants: { include: { user: true } } },
   });
 }
 
@@ -60,7 +60,7 @@ export async function createPrivateChat(
   ]);
   return prisma.conversation.findUnique({
     where: { id: conversation.id },
-    include: { participants: true },
+    include: { participants: { include: { user: true } } },
   });
 }
 
@@ -68,7 +68,7 @@ export async function listChats(userId?: string) {
   return await prisma.conversation.findMany({
     where: userId ? { participants: { some: { userId } } } : {},
     orderBy: { updatedAt: "desc" },
-    include: { participants: true },
+    include: { participants: { include: { user: true } } },
     take: 50,
   });
 }

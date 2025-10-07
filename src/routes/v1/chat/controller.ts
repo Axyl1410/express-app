@@ -8,24 +8,29 @@ import {
   listChats,
   listMessages,
 } from "./service";
+import {
+  createMessageBodySchema,
+  createMessageParamsSchema,
+  createPrivateChatSchema,
+  isZodBadRequestError,
+  listChatsQuerySchema,
+  listMessagesParamsSchema,
+  listMessagesQuerySchema,
+  parseOr400,
+  respondBadRequest,
+  roomForChat,
+  typingBodySchema,
+  typingParamsSchema,
+} from "./validation";
 
 export async function createPrivateChatController(req: Request, res: Response) {
   try {
-    const { userId, otherUserId, name } = req.body as {
-      userId: string;
-      otherUserId: string;
-      name?: string;
-    };
-    if (!userId || !otherUserId) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "userId and otherUserId required" });
-    }
+    const { userId, otherUserId, name } = parseOr400(
+      createPrivateChatSchema,
+      req.body
+    );
     if (userId === otherUserId) {
-      return res.status(400).json({
-        ok: false,
-        message: "Cannot create private chat with yourself",
-      });
+      return respondBadRequest(res, "Cannot create private chat with yourself");
     }
     const ok = await ensureUsersExist(userId, otherUserId);
     if (!ok) {
@@ -40,10 +45,11 @@ export async function createPrivateChatController(req: Request, res: Response) {
     const chat = await createPrivateChat(userId, otherUserId, name);
     const io = getIO();
     if (io) {
-      io.to(`chat:${chat?.id}`).emit("chat:created", { chat: chat });
+      io.to(roomForChat(chat?.id as string)).emit("chat:created", { chat });
     }
     return res.status(201).json({ ok: true, existed: false, data: chat });
   } catch (e) {
+    if (isZodBadRequestError(e)) return respondBadRequest(res, e.message);
     return res
       .status(500)
       .json({ ok: false, message: (e as Error).message || "Failed" });
@@ -52,10 +58,11 @@ export async function createPrivateChatController(req: Request, res: Response) {
 
 export async function listChatsController(req: Request, res: Response) {
   try {
-    const { userId } = req.query as { userId?: string };
+    const { userId } = parseOr400(listChatsQuerySchema, req.query);
     const chats = await listChats(userId);
     return res.json({ ok: true, data: chats });
   } catch (e) {
+    if (isZodBadRequestError(e)) return respondBadRequest(res, e.message);
     return res
       .status(500)
       .json({ ok: false, message: (e as Error).message || "Failed" });
@@ -64,12 +71,13 @@ export async function listChatsController(req: Request, res: Response) {
 
 export async function listMessagesController(req: Request, res: Response) {
   try {
-    const { chatId } = req.params;
-    const { cursor, limit } = req.query as { cursor?: string; limit?: string };
-    const take = Math.min(Number(limit) || 30, 100);
+    const { chatId } = parseOr400(listMessagesParamsSchema, req.params);
+    const { cursor, limit } = parseOr400(listMessagesQuerySchema, req.query);
+    const take = Math.min(limit || 30, 100);
     const messages = await listMessages(chatId, cursor, take);
     return res.json({ ok: true, data: messages });
   } catch (e) {
+    if (isZodBadRequestError(e)) return respondBadRequest(res, e.message);
     return res
       .status(500)
       .json({ ok: false, message: (e as Error).message || "Failed" });
@@ -78,23 +86,16 @@ export async function listMessagesController(req: Request, res: Response) {
 
 export async function createMessageController(req: Request, res: Response) {
   try {
-    const { chatId } = req.params;
-    const { senderId, content } = req.body as {
-      senderId: string;
-      content: string;
-    };
-    if (!senderId || !content) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "senderId and content required" });
-    }
+    const { chatId } = parseOr400(createMessageParamsSchema, req.params);
+    const { senderId, content } = parseOr400(createMessageBodySchema, req.body);
     const message = await createMessage(chatId, senderId, content);
     const io = getIO();
     if (io) {
-      io.to(`chat:${chatId}`).emit("chat:new-message", { chatId, message });
+      io.to(roomForChat(chatId)).emit("chat:new-message", { chatId, message });
     }
     return res.status(201).json({ ok: true, data: message });
   } catch (e) {
+    if (isZodBadRequestError(e)) return respondBadRequest(res, e.message);
     return res
       .status(500)
       .json({ ok: false, message: (e as Error).message || "Failed" });
@@ -102,11 +103,18 @@ export async function createMessageController(req: Request, res: Response) {
 }
 
 export function typingController(req: Request, res: Response) {
-  const { chatId } = req.params;
-  const { userId, typing } = req.body as { userId: string; typing: boolean };
-  const io = getIO();
-  if (io) {
-    io.to(`chat:${chatId}`).emit("chat:typing", { userId, typing });
+  try {
+    const { chatId } = parseOr400(typingParamsSchema, req.params);
+    const { userId, typing } = parseOr400(typingBodySchema, req.body);
+    const io = getIO();
+    if (io) {
+      io.to(roomForChat(chatId)).emit("chat:typing", { userId, typing });
+    }
+    return res.json({ ok: true });
+  } catch (e) {
+    if (isZodBadRequestError(e)) return respondBadRequest(res, e.message);
+    return res
+      .status(500)
+      .json({ ok: false, message: (e as Error).message || "Failed" });
   }
-  return res.json({ ok: true });
 }
