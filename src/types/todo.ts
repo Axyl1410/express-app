@@ -4,4 +4,5 @@ export type TodoItemInterface = {
   description?: string;
   dueDate: string;
   status: boolean;
+  userId: string;
 };

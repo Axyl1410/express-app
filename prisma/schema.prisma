@@ -1,10 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// ===============================================
-// KHỐI CÓ SẴN - KHÔNG THAY ĐỔI
-// ===============================================
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,174 +8,36 @@ datasource db {
 }
 
 model User {
-  id              String    @id @default(cuid()) @map("_id") // Thay đổi sang cuid() cho an toàn hơn
-  name            String
-  email           String
-  emailVerified   Boolean   @default(false)
-  image           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @default(now()) @updatedAt
-  username        String?
-  displayUsername String?
-  sessions        Session[]
-  accounts        Account[]
+  id       String    @id @default(auto()) @map("_id") @db.ObjectId
+  name     String
+  password String
+  phone    String?
+  email    String    @unique
+  todos    Todo[]
+  active   Boolean   @default(true)
+  sessions Session[]
 
-  // Quan hệ cho chức năng chat
-  conversations ConversationParticipant[]
-  sentMessages  Message[]
-  readReceipts  ReadReceipt[]
-  uploadedMedia Media[]
+  @@map("users")
+}
 
-  @@unique([email])
-  @@unique([username])
-  @@map("user")
+model Todo {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  task        String
+  description String?
+  dueDate     String
+  status      Boolean @default(false)
+  userId      String  @db.ObjectId
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("todos")
 }
 
 model Session {
-  id        String   @id @map("_id")
-  expiresAt DateTime
-  token     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
-  userId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  token     String   @unique
+  userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
 
-  @@unique([token])
-  @@map("session")
-}
-
-model Account {
-  id                    String    @id @map("_id")
-  accountId             String
-  providerId            String
-  userId                String
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accessToken           String?
-  refreshToken          String?
-  idToken               String?
-  accessTokenExpiresAt  DateTime?
-  refreshTokenExpiresAt DateTime?
-  scope                 String?
-  password              String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  @@map("account")
-}
-
-model Verification {
-  id         String   @id @map("_id")
-  identifier String
-  value      String
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @default(now()) @updatedAt
-
-  @@map("verification")
-}
-
-// ===============================================
-// KHỐI MỚI - DÀNH CHO CHỨC NĂNG CHAT
-// ===============================================
-
-// Enums để định nghĩa các loại và vai trò
-enum ConversationType {
-  PRIVATE
-  GROUP
-}
-
-enum ParticipantRole {
-  MEMBER
-  ADMIN
-}
-
-enum MediaType {
-  IMAGE
-  VIDEO
-  FILE
-}
-
-// Model cho cuộc trò chuyện (1-1 hoặc nhóm)
-model Conversation {
-  id        String           @id @default(cuid()) @map("_id")
-  name      String? // Tên cho group chat
-  imageUrl  String? // Ảnh đại diện cho group chat
-  type      ConversationType @default(PRIVATE)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-
-  // Mối quan hệ
-  participants ConversationParticipant[]
-  messages     Message[]
-
-  @@map("conversations")
-}
-
-// Model trung gian để kết nối User và Conversation (thành viên)
-model ConversationParticipant {
-  id       String          @id @default(cuid()) @map("_id")
-  role     ParticipantRole @default(MEMBER)
-  joinedAt DateTime        @default(now())
-
-  // Mối quan hệ
-  userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, conversationId]) // Đảm bảo người dùng không thể tham gia 2 lần
-  @@map("conversation_participants")
-}
-
-// Model cho một tin nhắn
-model Message {
-  id        String   @id @default(cuid()) @map("_id")
-  content   String? // Có thể null nếu chỉ gửi media
-  deleted   Boolean  @default(false) // Để soft delete
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Mối quan hệ
-  senderId       String
-  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  media  Media[]
-  readBy ReadReceipt[]
-
-  @@map("messages")
-}
-
-// Model cho media đính kèm (ảnh, video, file)
-model Media {
-  id        String    @id @default(cuid()) @map("_id")
-  url       String
-  type      MediaType
-  createdAt DateTime  @default(now())
-
-  // Mối quan hệ
-  messageId  String
-  message    Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  uploaderId String
-  uploader   User    @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
-
-  @@map("media")
-}
-
-// Model để theo dõi trạng thái "đã đọc"
-model ReadReceipt {
-  id     String   @id @default(cuid()) @map("_id")
-  readAt DateTime @default(now())
-
-  // Mối quan hệ
-  userId    String
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messageId String
-  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, messageId])
-  @@map("read_receipts")
+  @@map("sessions")
 }
