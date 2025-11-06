@@ -94,4 +94,3 @@ export const deleteUser = async (id: string) => {
 
   return { message: "User deactivated successfully" };
 };
-
