@@ -1,6 +1,6 @@
+import type { NextFunction, Request, Response } from "express";
 import logger from "@/lib/logger";
 import prisma from "@/lib/prisma-client";
-import type { NextFunction, Request, Response } from "express";
 
 const AuthMiddleware = async (
   req: Request,

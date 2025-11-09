@@ -1,3 +1,4 @@
+import express, { type Request, type Response, type Router } from "express";
 import {
   sendError,
   sendErrorFromException,
@@ -7,7 +8,6 @@ import {
 import logger from "@/lib/logger";
 import AuthMiddleware from "@/middleware/auth.middleware";
 import type { UserInterface } from "@/types/user";
-import express, { type Request, type Response, type Router } from "express";
 import { deleteUser, getUsers, updateUser } from "./service";
 
 const userRouter: Router = express.Router();
