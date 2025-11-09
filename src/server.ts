@@ -1,3 +1,4 @@
+import { sendSuccess } from "@/lib/api-response-helper";
 import express, { type Request, type Response } from "express";
 import logMiddleware from "./middleware/log.middleware";
 import v1 from "./routes/v1";
@@ -20,11 +21,14 @@ export const CreateServer = () => {
     .use(logMiddleware);
 
   app.get("/", (_req: Request, res: Response) => {
-    res.send("Hello, World!");
+    sendSuccess(res,  "Welcome to API");
   });
 
   app.get("/health", (_req: Request, res: Response) => {
-    res.json({ ok: true, timeStamp: new Date().toISOString() });
+    sendSuccess(
+      res,
+      "Server is healthy",
+    );
   });
 
   app.use(express.static("public"));

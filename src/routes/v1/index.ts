@@ -5,7 +5,7 @@ import {
     sendSuccessNoData,
 } from "@/lib/api-response-helper";
 import logger from "@/lib/logger";
-import prisma from "@/prisma-client";
+import prisma from "@/lib/prisma-client";
 import express, { type Request, type Response, type Router } from "express";
 import { randomUUID } from "node:crypto";
 import userRouter from "./user";
@@ -94,7 +94,7 @@ v1.post("/login", async (req: Request, res: Response) => {
 
     logger.info({ userId: userExists.id, email }, "User logged in successfully");
     res.set("x-auth-token", token);
-    sendSuccess(res, { token }, "Login successful");
+    sendSuccess(res,  "Login successful");
   } catch (error) {
     logger.error({ error, email: req.body.email }, "Error during login");
     sendErrorFromException(res, error instanceof Error ? error : String(error), 500);

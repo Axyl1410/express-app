@@ -1,5 +1,5 @@
+import prisma from "@/lib/prisma-client";
 import { RedisClient } from "@/lib/redis";
-import prisma from "@/prisma-client";
 import type { UserInterface } from "@/types/user";
 
 export const getUsers = async () => {
