@@ -1,13 +1,19 @@
-import { randomUUID } from "node:crypto";
-import express, { type Request, type Response, type Router } from "express";
+import {
+    sendError,
+    sendErrorFromException,
+    sendSuccess,
+    sendSuccessNoData,
+} from "@/lib/api-response-helper";
 import logger from "@/lib/logger";
 import prisma from "@/prisma-client";
+import express, { type Request, type Response, type Router } from "express";
+import { randomUUID } from "node:crypto";
 import userRouter from "./user";
 
 const v1: Router = express.Router();
 
 v1.get("/", (_req: Request, res: Response) => {
-  res.json({ message: "Hello, World!" });
+  sendSuccess(res, { message: "Hello, World!" }, "Welcome to API v1");
 });
 
 v1.post("/register", async (req: Request, res: Response) => {
@@ -20,7 +26,7 @@ v1.post("/register", async (req: Request, res: Response) => {
 
     if (userExists) {
       logger.warn({ email }, "Registration attempt with existing email");
-      return res.status(400).json({ message: "User already exists" });
+      return sendError(res, "User already exists", 400);
     }
 
     const user = await prisma.user.create({
@@ -29,14 +35,14 @@ v1.post("/register", async (req: Request, res: Response) => {
 
     if (user) {
       logger.info({ userId: user.id, email }, "User registered successfully");
-      res.json({ message: "User created successfully" });
+      sendSuccessNoData(res, "User created successfully", 201);
     } else {
       logger.error({ email }, "Failed to create user");
-      return res.status(400).json({ message: "Failed to create user" });
+      return sendError(res, "Failed to create user", 400);
     }
   } catch (error) {
     logger.error({ error, email: req.body.email }, "Error during registration");
-    res.status(500).json({ message: "Internal server error" });
+    sendErrorFromException(res, error instanceof Error ? error : String(error), 500);
   }
 });
 
@@ -50,20 +56,20 @@ v1.post("/login", async (req: Request, res: Response) => {
 
     if (!userExists) {
       logger.warn({ email }, "Login attempt with non-existent user");
-      return res.status(401).json({ message: "Invalid username or password" });
+      return sendError(res, "Invalid username or password", 401);
     }
 
     const passwordValid = password === userExists.password;
 
     if (!passwordValid) {
       logger.warn({ userId: userExists.id, email }, "Login attempt with invalid password");
-      return res.status(401).json({ message: "Invalid username or password" });
+      return sendError(res, "Invalid username or password", 401);
     }
 
     // Check if user is active
     if (!userExists.active) {
       logger.warn({ userId: userExists.id, email }, "Login attempt with inactive account");
-      return res.status(403).json({ message: "User account is inactive" });
+      return sendError(res, "User account is inactive", 403);
     }
 
     // Generate token
@@ -88,10 +94,10 @@ v1.post("/login", async (req: Request, res: Response) => {
 
     logger.info({ userId: userExists.id, email }, "User logged in successfully");
     res.set("x-auth-token", token);
-    res.json({ message: "Login successful", token });
+    sendSuccess(res, { token }, "Login successful");
   } catch (error) {
     logger.error({ error, email: req.body.email }, "Error during login");
-    res.status(500).json({ message: "Internal server error" });
+    sendErrorFromException(res, error instanceof Error ? error : String(error), 500);
   }
 });
 

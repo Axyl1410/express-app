@@ -1,6 +1,7 @@
 import express, { type Request, type Response } from "express";
 import logMiddleware from "./middleware/log.middleware";
 import v1 from "./routes/v1";
+import v2 from "./routes/v2";
 
 const cors = require("cors");
 
@@ -29,6 +30,7 @@ export const CreateServer = () => {
   app.use(express.static("public"));
 
   app.use("/v1", v1);
+  app.use("/v2", v2);
 
   return app;
 };
