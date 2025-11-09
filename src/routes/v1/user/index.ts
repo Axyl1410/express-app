@@ -1,15 +1,17 @@
 import express, { type Request, type Response, type Router } from "express";
-import AuthMiddleware from "../../../middleware/auth.middleware";
-import * as UserService from "./service";
-import type { UserInterface } from "../../../types/user";
+import logger from "@/lib/logger";
+import AuthMiddleware from "@/middleware/auth.middleware";
+import type { UserInterface } from "@/types/user";
+import { deleteUser, getUsers, updateUser } from "./service";
 
 const userRouter: Router = express.Router();
 
 userRouter.get("/", AuthMiddleware, async (_req: Request, res: Response) => {
   try {
-    const users = await UserService.getUsers();
+    const users = await getUsers();
     res.json(users);
   } catch (error) {
+    logger.error(error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -21,12 +23,20 @@ userRouter.put("/:id", AuthMiddleware, async (req: Request, res: Response) => {
 
     const updateData: Partial<Omit<UserInterface, "id" | "active">> = {};
 
-    if (name !== undefined) updateData.name = name;
-    if (email !== undefined) updateData.email = email;
-    if (phone !== undefined) updateData.phone = phone || null;
-    if (password !== undefined) updateData.password = password;
+    if (name !== undefined) {
+      updateData.name = name;
+    }
+    if (email !== undefined) {
+      updateData.email = email;
+    }
+    if (phone !== undefined) {
+      updateData.phone = phone || null;
+    }
+    if (password !== undefined) {
+      updateData.password = password;
+    }
 
-    const updatedUser = await UserService.updateUser(id, updateData);
+    const updatedUser = await updateUser(id, updateData);
 
     res.json({ message: "User updated successfully", user: updatedUser });
   } catch (error) {
@@ -49,7 +59,7 @@ userRouter.delete(
     try {
       const { id } = req.params;
 
-      const result = await UserService.deleteUser(id);
+      const result = await deleteUser(id);
 
       res.json(result);
     } catch (error) {
@@ -62,4 +72,3 @@ userRouter.delete(
 );
 
 export default userRouter;
-

@@ -1,6 +1,6 @@
-import { RedisClient } from "../../../lib/redis";
-import prisma from "../../../prisma-client";
-import type { UserInterface } from "../../../types/user";
+import { RedisClient } from "@/lib/redis";
+import prisma from "@/prisma-client";
+import type { UserInterface } from "@/types/user";
 
 export const getUsers = async () => {
   const cacheKey = "users";
@@ -44,12 +44,6 @@ export const updateUser = async (
     }
   }
 
-  // Invalidate cache
-  if (!RedisClient.isOpen) {
-    await RedisClient.connect();
-  }
-  await RedisClient.del("users");
-
   // Update user
   const updatedUser = await prisma.user.update({
     where: { id },
@@ -61,6 +55,16 @@ export const updateUser = async (
       password: true,
     },
   });
+
+  // Invalidate cache AFTER successful DB update to avoid race conditions
+  try {
+    if (!RedisClient.isOpen) {
+      await RedisClient.connect();
+    }
+    await RedisClient.del("users");
+  } catch (_) {
+    // Swallow cache errors; cache will naturally expire
+  }
 
   return updatedUser;
 };
@@ -75,12 +79,6 @@ export const deleteUser = async (id: string) => {
     throw new Error("User not found");
   }
 
-  // Invalidate cache
-  if (!RedisClient.isOpen) {
-    await RedisClient.connect();
-  }
-  await RedisClient.del("users");
-
   // Set user as inactive
   await prisma.user.update({
     where: { id },
@@ -91,6 +89,16 @@ export const deleteUser = async (id: string) => {
   await prisma.session.deleteMany({
     where: { userId: id },
   });
+
+  // Invalidate cache AFTER successful DB changes
+  try {
+    if (!RedisClient.isOpen) {
+      await RedisClient.connect();
+    }
+    await RedisClient.del("users");
+  } catch (_) {
+    // Swallow cache errors; cache will naturally expire
+  }
 
   return { message: "User deactivated successfully" };
 };

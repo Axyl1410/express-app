@@ -43,13 +43,11 @@ export const validateUserUpdate = (
     });
   }
 
-  if (email !== undefined) {
-    if (typeof email !== "string" || email.trim().length === 0) {
+  if (email !== undefined && (typeof email !== "string" || email.trim().length === 0)) {
       return res.status(400).json({
         message: "Email must be a non-empty string",
       });
     }
-  }
 
   if (
     phone !== undefined &&

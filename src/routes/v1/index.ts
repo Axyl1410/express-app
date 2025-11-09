@@ -1,6 +1,6 @@
-import express, { type Request, type Response, type Router } from "express";
 import { randomUUID } from "node:crypto";
-import prisma from "../../prisma-client";
+import express, { type Request, type Response, type Router } from "express";
+import prisma from "@/prisma-client";
 import userRouter from "./user";
 
 const v1: Router = express.Router();
