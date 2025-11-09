@@ -1,6 +1,5 @@
 import logger from "@/lib/logger";
 import type { NextFunction, Request, Response } from "express";
-import logger from "@/lib/logger";
 
 const logMiddleware = (req: Request, _res: Response, next: NextFunction) => {
   logger.info(
