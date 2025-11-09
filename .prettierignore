@@ -1,0 +1,4 @@
+# Disable Prettier for entire project
+# This project uses Biome/Ultracite for formatting
+*
+
