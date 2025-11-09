@@ -1,6 +1,6 @@
 /**
  * API Response Helper for Express.js
- * 
+ *
  * Standard JSON response format:
  * - Success: { result: "SUCCESS", message: string, data: T }
  * - Error: { result: "ERROR", message: string, data: null }
@@ -14,15 +14,15 @@ import logger from "@/lib/logger";
 export type ApiResult = "SUCCESS" | "ERROR";
 
 export type ApiSuccessResponse<T = unknown> = {
-  result: "SUCCESS";
-  message: string;
-  data: T;
+	result: "SUCCESS";
+	message: string;
+	data: T;
 };
 
 export type ApiErrorResponse = {
-  result: "ERROR";
-  message: string;
-  data: null;
+	result: "ERROR";
+	message: string;
+	data: null;
 };
 
 export type ApiResponse<T = unknown> = ApiSuccessResponse<T> | ApiErrorResponse;
@@ -36,14 +36,14 @@ export type ApiResponse<T = unknown> = ApiSuccessResponse<T> | ApiErrorResponse;
  * @returns ApiSuccessResponse
  */
 export function createSuccessResponse<T>(
-  data: T,
-  message = "Success",
+	data: T,
+	message = "Success"
 ): ApiSuccessResponse<T> {
-  return {
-    result: "SUCCESS",
-    message,
-    data,
-  };
+	return {
+		result: "SUCCESS",
+		message,
+		data,
+	};
 }
 
 /**
@@ -52,13 +52,13 @@ export function createSuccessResponse<T>(
  * @returns ApiSuccessResponse<null>
  */
 export function createSuccessNoDataResponse(
-  message = "Success",
+	message = "Success"
 ): ApiSuccessResponse<null> {
-  return {
-    result: "SUCCESS",
-    message,
-    data: null,
-  };
+	return {
+		result: "SUCCESS",
+		message,
+		data: null,
+	};
 }
 
 /**
@@ -67,11 +67,11 @@ export function createSuccessNoDataResponse(
  * @returns ApiErrorResponse
  */
 export function createErrorResponse(message: string): ApiErrorResponse {
-  return {
-    result: "ERROR",
-    message,
-    data: null,
-  };
+	return {
+		result: "ERROR",
+		message,
+		data: null,
+	};
 }
 
 /**
@@ -80,10 +80,10 @@ export function createErrorResponse(message: string): ApiErrorResponse {
  * @returns ApiErrorResponse
  */
 export function createErrorResponseFromException(
-  error: Error | string,
+	error: Error | string
 ): ApiErrorResponse {
-  const message = error instanceof Error ? error.message : error;
-  return createErrorResponse(message);
+	const message = error instanceof Error ? error.message : error;
+	return createErrorResponse(message);
 }
 
 /**
@@ -91,10 +91,10 @@ export function createErrorResponseFromException(
  * @deprecated Use individual functions instead of this object
  */
 export const ApiResponseBuilder = {
-  success: createSuccessResponse,
-  successNoData: createSuccessNoDataResponse,
-  error: createErrorResponse,
-  errorFromException: createErrorResponseFromException,
+	success: createSuccessResponse,
+	successNoData: createSuccessNoDataResponse,
+	error: createErrorResponse,
+	errorFromException: createErrorResponseFromException,
 } as const;
 
 // ==================== Express.js Response Helpers ====================
@@ -107,13 +107,13 @@ export const ApiResponseBuilder = {
  * @param statusCode - HTTP status code (default: 200)
  */
 export function sendSuccess<T>(
-  res: Response,
-  data: T,
-  message = "Success",
-  statusCode = 200,
+	res: Response,
+	data: T,
+	message = "Success",
+	statusCode = 200
 ): void {
-  const response = createSuccessResponse(data, message);
-  res.status(statusCode).json(response);
+	const response = createSuccessResponse(data, message);
+	res.status(statusCode).json(response);
 }
 
 /**
@@ -123,12 +123,12 @@ export function sendSuccess<T>(
  * @param statusCode - HTTP status code (default: 200)
  */
 export function sendSuccessNoData(
-  res: Response,
-  message = "Success",
-  statusCode = 200,
+	res: Response,
+	message = "Success",
+	statusCode = 200
 ): void {
-  const response = createSuccessNoDataResponse(message);
-  res.status(statusCode).json(response);
+	const response = createSuccessNoDataResponse(message);
+	res.status(statusCode).json(response);
 }
 
 /**
@@ -138,12 +138,12 @@ export function sendSuccessNoData(
  * @param statusCode - HTTP status code (default: 400)
  */
 export function sendError(
-  res: Response,
-  message: string,
-  statusCode = 400,
+	res: Response,
+	message: string,
+	statusCode = 400
 ): void {
-  const response = createErrorResponse(message);
-  res.status(statusCode).json(response);
+	const response = createErrorResponse(message);
+	res.status(statusCode).json(response);
 }
 
 /**
@@ -153,26 +153,26 @@ export function sendError(
  * @param statusCode - HTTP status code (default: 400)
  */
 export function sendErrorFromException(
-  res: Response,
-  error: Error | string,
-  statusCode = 400,
+	res: Response,
+	error: Error | string,
+	statusCode = 400
 ): void {
-  const response = createErrorResponseFromException(error);
-  res.status(statusCode).json(response);
+	const response = createErrorResponseFromException(error);
+	res.status(statusCode).json(response);
 }
 
 // ==================== Async Handler Wrapper ====================
 
 type AsyncRequestHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
+	req: Request,
+	res: Response,
+	next: NextFunction
 ) => Promise<void>;
 
 /**
  * Wrapper to automatically handle async errors
  * Use to wrap async route handlers
- * 
+ *
  * @example
  * router.get('/users', asyncHandler(async (req, res) => {
  *   const users = await userService.getAll();
@@ -180,11 +180,11 @@ type AsyncRequestHandler = (
  * }));
  */
 export function asyncHandler(fn: AsyncRequestHandler) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    Promise.resolve(fn(req, res, next)).catch((error) => {
-      sendErrorFromException(res, error, 500);
-    });
-  };
+	return (req: Request, res: Response, next: NextFunction): void => {
+		Promise.resolve(fn(req, res, next)).catch((error) => {
+			sendErrorFromException(res, error, 500);
+		});
+	};
 }
 
 // ==================== Error Handler Middleware ====================
@@ -194,16 +194,16 @@ export function asyncHandler(fn: AsyncRequestHandler) {
  * Usage: app.use(errorHandler);
  */
 export function errorHandler(
-  error: Error,
-  _req: Request,
-  res: Response,
-  _next: NextFunction,
+	error: Error,
+	_req: Request,
+	res: Response,
+	_next: NextFunction
 ): void {
-  // Log error
-  logger.error(error);
+	// Log error
+	logger.error(error);
 
-  // Send error response
-  sendErrorFromException(res, error, 500);
+	// Send error response
+	sendErrorFromException(res, error, 500);
 }
 
 // ==================== Usage Examples ====================
@@ -262,4 +262,3 @@ app.use(errorHandler);
 
 app.listen(3000);
 */
-
