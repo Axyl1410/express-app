@@ -9,9 +9,9 @@
     "dev": "nodemon",
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "prisma generate",
-    "lint": "npx ultracite@latest check",
-    "format": "npx ultracite@latest fix",
-    "prepare": "husky && lefthook install"
+    "lint": "biome check",
+    "format": "biome format --write",
+    "prepare": "husky && lefthook uninstall && lefthook install"
   },
   "keywords": [],
   "author": "",

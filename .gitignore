@@ -172,3 +172,5 @@ config/local.ts
 
 # Husky auto-generated files (managed by lefthook)
 .husky/_/
+
+.vercel

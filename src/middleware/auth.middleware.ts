@@ -3,34 +3,34 @@ import logger from "@/lib/logger";
 import prisma from "@/lib/prisma";
 
 const AuthMiddleware = async (
-	req: Request,
-	res: Response,
-	next: NextFunction
+  req: Request,
+  res: Response,
+  next: NextFunction
 ) => {
-	const token = req.headers["x-auth-token"];
+  const token = req.headers["x-auth-token"];
 
-	const session = await prisma.session.findFirst({
-		where: {
-			token: token as string,
-		},
-	});
+  const session = await prisma.session.findFirst({
+    where: {
+      token: token as string,
+    },
+  });
 
-	if (!session) {
-		logger.warn(
-			{
-				path: req.path,
-				method: req.method,
-				ip: req.ip,
-				hasToken: !!token,
-			},
-			"Unauthorized: Invalid or expired token"
-		);
-		return res
-			.status(401)
-			.json({ message: "Unauthorized: Invalid or expired token" });
-	}
+  if (!session) {
+    logger.warn(
+      {
+        path: req.path,
+        method: req.method,
+        ip: req.ip,
+        hasToken: !!token,
+      },
+      "Unauthorized: Invalid or expired token"
+    );
+    return res
+      .status(401)
+      .json({ message: "Unauthorized: Invalid or expired token" });
+  }
 
-	next();
+  next();
 };
 
 export default AuthMiddleware;
