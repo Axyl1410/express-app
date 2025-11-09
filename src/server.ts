@@ -1,10 +1,9 @@
-import express, { type Request, type Response } from "express";
 import { sendSuccess } from "@/lib/api-response-helper";
+import cors from "cors";
+import express, { type Request, type Response } from "express";
 import logMiddleware from "./middleware/log.middleware";
 import v1 from "./routes/v1";
 import v2 from "./routes/v2";
-
-const cors = require("cors");
 
 const corsOptions = {
   origin: "*",
@@ -21,12 +20,13 @@ export const CreateServer = () => {
     .use(logMiddleware);
 
   app.get("/", (_req: Request, res: Response) => {
-    sendSuccess(res,  "Welcome to API");
+    sendSuccess(res, { message: "Hello, World!" }, "Welcome to API");
   });
 
   app.get("/health", (_req: Request, res: Response) => {
     sendSuccess(
       res,
+      { timestamp: new Date().toISOString() },
       "Server is healthy",
     );
   });
