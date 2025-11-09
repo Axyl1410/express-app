@@ -1,43 +1,591 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mongodb"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id       String    @id @default(auto()) @map("_id") @db.ObjectId
-  name     String
-  password String
-  phone    String?
-  email    String    @unique
-  todos    Todo[]
-  active   Boolean   @default(true)
-  sessions Session[]
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+  sessions      Session[]
+  accounts      Account[]
 
-  @@map("users")
-}
+  role       String?
+  banned     Boolean?  @default(false)
+  banReason  String?
+  banExpires DateTime?
 
-model Todo {
-  id          String  @id @default(auto()) @map("_id") @db.ObjectId
-  task        String
-  description String?
-  dueDate     String
-  status      Boolean @default(false)
-  userId      String  @db.ObjectId
-  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // --- Quan hệ với các bảng E-commerce mới ---
+  addresses     Address[]
+  carts         Cart[]
+  orders        Order[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
+  auditLogs     AuditLog[]
 
-  @@map("todos")
+  @@unique([email])
+  @@map("user")
 }
 
 model Session {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  token     String   @unique
-  userId    String   @db.ObjectId
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
+  id             String   @id
+  expiresAt      DateTime
+  token          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy String?
 
-  @@map("sessions")
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@map("verification")
+}
+
+// =================================================================
+// 1. CÁC BẢNG QUẢN LÝ THÔNG TIN USER (MỞ RỘNG)
+// =================================================================
+
+model Address {
+  id     String @id @default(cuid())
+  userId String // Khóa ngoại kiểu String để khớp với User.id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String // Tên người nhận
+  phone       String // SĐT người nhận
+  addressLine String // Địa chỉ chi tiết (số nhà, đường)
+  city        String // Thành phố
+  district    String // Quận/Huyện
+  province    String // Phường/Xã (hoặc Tỉnh/Thành)
+  postalCode  String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  // orders      Order[]  // Không cần, đã snapshot địa chỉ vào Order
+  @@map("address")
+}
+
+// =================================================================
+// 2. CÁC BẢNG QUẢN LÝ SẢN PHẨM (CATALOG)
+// =================================================================
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String? @db.Text
+  imageUrl    String?
+
+  // Cấu trúc cây (đệ quy)
+  parentId String?
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryHierarchy")
+
+  sortOrder Int?     @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+
+  // --- MỚI: Quan hệ với Coupon ---
+  applicableCoupons CouponApplicableCategory[] // Thêm quan hệ ngược
+  excludedCoupons   CouponExcludedCategory[] // Thêm quan hệ ngược
+
+  @@map("category")
+}
+
+model Brand {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?  @db.Text
+  logoUrl     String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@map("brand")
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String? @db.Text
+
+  brandId String?
+  brand   Brand?  @relation(fields: [brandId], references: [id], onDelete: SetNull)
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  defaultImage String?
+
+  // SEO
+  seoMetaTitle String?
+  seoMetaDesc  String?
+
+  status    ProductStatus @default(DRAFT)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  // Quan hệ
+  variants      ProductVariant[]
+  images        ProductImage[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
+  tags          ProductTag[]
+
+  // --- MỚI: Quan hệ với Coupon ---
+  applicableCoupons CouponApplicableProduct[] // Thêm quan hệ ngược
+  excludedCoupons   CouponExcludedProduct[] // Thêm quan hệ ngược
+
+  @@map("product")
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  sku           String?  @unique // Mã SKU
+  attributes    Json? // Ví dụ: { "color": "Blue", "size": "M" }
+  price         Decimal  @db.Decimal(12, 2) // Giá gốc
+  salePrice     Decimal? @db.Decimal(12, 2) // Giá khuyến mãi
+  stockQuantity Int      @default(0)
+  weight        Float? // Cân nặng (để tính phí ship)
+  barcode       String? // EAN/UPC
+
+  // Quan hệ
+  images     ProductImage[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@map("product_variant")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Có thể gán ảnh cho 1 variant cụ thể (ví dụ: ảnh của áo màu đỏ)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  url       String // Đường dẫn ảnh (S3/GCS/Local)
+  altText   String?
+  sortOrder Int?    @default(0)
+
+  @@map("product_image")
+}
+
+model Tag {
+  id       String       @id @default(cuid())
+  name     String       @unique
+  slug     String       @unique
+  products ProductTag[]
+
+  @@map("tag")
+}
+
+// Bảng trung gian cho quan hệ N-N Product <-> Tag
+model ProductTag {
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tagId     String
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@map("product_tag")
+}
+
+enum ProductStatus {
+  DRAFT // Bản nháp
+  PUBLISHED // Đang bán
+  ARCHIVED // Đã lưu trữ (ẩn)
+}
+
+// =================================================================
+// 3. CÁC BẢNG QUẢN LÝ GIỎ HÀNG (CART)
+// =================================================================
+
+model Cart {
+  id String @id @default(cuid())
+
+  // Liên kết với User (nếu đã đăng nhập)
+  userId String? @unique // Khóa ngoại String, 1 user chỉ có 1 giỏ hàng
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Dùng cho khách (guest)
+  sessionId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items CartItem[]
+
+  @@map("cart")
+}
+
+model CartItem {
+  id     String @id @default(cuid())
+  cartId String
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  quantity Int
+
+  // Nên lưu giá tại thời điểm thêm vào giỏ để kiểm tra nếu giá thay đổi
+  priceAtAdd Decimal  @db.Decimal(12, 2)
+  createdAt  DateTime @default(now())
+
+  @@map("cart_item")
+}
+
+// =================================================================
+// 4. CÁC BẢNG QUẢN LÝ ĐƠN HÀNG & THANH TOÁN (ORDER & PAYMENT)
+// =================================================================
+
+model Order {
+  id      String @id @default(cuid())
+  orderNo String @unique // Mã đơn hàng (VD: "DH-2025-0001")
+
+  userId String // Khóa ngoại String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  totalAmount    Decimal @db.Decimal(12, 2) // Tổng tiền hàng
+  shippingFee    Decimal @default(0) @db.Decimal(12, 2)
+  discountAmount Decimal @default(0) @db.Decimal(12, 2)
+  finalAmount    Decimal @db.Decimal(12, 2) // Tổng cuối (total + shipping - discount)
+
+  payStatus   PaymentStatus @default(PENDING)
+  orderStatus OrderStatus   @default(PENDING)
+
+  paymentMethod String? // "COD", "VNPay", "Momo"
+
+  // Snapshot địa chỉ giao hàng tại thời điểm đặt
+  // An toàn hơn là dùng FK đến bảng Address
+  shippingAddress Json // { "name": "Amee", "phone": "090..." ... }
+
+  notes          String? @db.Text // Ghi chú của khách hàng
+  adminNotes     String? @db.Text // Ghi chú nội bộ của admin
+  trackingNumber String? // Mã vận đơn
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items         OrderItem[]
+  payments      Payment[]
+  statusHistory OrderStatusHistory[]
+
+  // --- MỚI: Thêm liên kết Coupon ---
+  couponId String?
+  coupon   Coupon? @relation(fields: [couponId], references: [id], onDelete: SetNull) // SetNull để giữ lại lịch sử đơn hàng dù coupon bị xóa
+
+  // --- CẬP NHẬT: Thêm trường để lưu mã coupon đã áp dụng ---
+  // (Rất quan trọng để tra cứu sau này, ngay cả khi coupon gốc bị thay đổi/xóa)
+  appliedCouponCode String?
+
+  @@map("order")
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict) // Không cho xóa variant nếu đã có trong đơn hàng
+
+  // Snapshot thông tin sản phẩm
+  productName       String
+  variantAttributes Json?
+
+  unitPrice Decimal @db.Decimal(12, 2) // Giá bán tại thời điểm đặt
+  quantity  Int
+  subtotal  Decimal @db.Decimal(12, 2) // unitPrice * quantity
+
+  // Dùng cho việc đánh giá
+  review Review?
+
+  @@map("order_item")
+}
+
+model Payment {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  provider      String // "VNPay", "Momo", "Stripe", "COD"
+  status        String // "pending", "success", "failed" (theo provider)
+  amount        Decimal  @db.Decimal(12, 2)
+  providerTxnId String? // Mã giao dịch của cổng thanh toán
+  metadata      Json? // Dữ liệu webhook trả về
+  createdAt     DateTime @default(now())
+
+  @@map("payment")
+}
+
+// Ghi lại lịch sử thay đổi trạng thái đơn hàng
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus // Trạng thái mới
+  notes     String? // Ghi chú (VD: "Hủy bởi khách hàng")
+  changedBy String? // ID của admin/user hoặc "SYSTEM"
+  createdAt DateTime    @default(now())
+
+  @@map("order_status_history")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum OrderStatus {
+  PENDING // Chờ thanh toán/xác nhận
+  CONFIRMED // Đã xác nhận (cho COD) / Đã thanh toán (cho online)
+  PROCESSING // Đang xử lý (đóng gói)
+  SHIPPED // Đã giao vận chuyển
+  DELIVERED // Đã giao thành công
+  CANCELLED // Đã hủy
+  RETURNED // Yêu cầu trả hàng
+  REFUNDED // Đã hoàn tiền
+}
+
+// =================================================================
+// 5. CÁC BẢNG KHÁC (REVIEW, COUPON, WISHLIST, CMS, LOG)
+// =================================================================
+
+model Review {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  userId String // Khóa ngoại String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Liên kết với item đã mua (để xác thực "chỉ user mua mới được review")
+  orderItemId String?    @unique // 1 order item chỉ có 1 review
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  rating Int // 1-5 sao
+  title  String?
+  body   String? @db.Text
+
+  status    ReviewStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+
+  @@map("review")
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Coupon {
+  id    String     @id @default(cuid())
+  code  String     @unique
+  type  CouponType // PERCENT, FIXED, FREE_SHIPPING
+  value Decimal    @db.Decimal(12, 2) // Giá trị % hoặc số tiền
+
+  description String?
+
+  // 1. Điều kiện sử dụng
+  minOrderAmount Decimal? @db.Decimal(12, 2) // Giá trị đơn hàng tối thiểu
+  startsAt       DateTime
+  endsAt         DateTime
+
+  // 2. Giới hạn sử dụng
+  usageLimit        Int? // Tổng số lượt
+  usedCount         Int  @default(0)
+  usageLimitPerUser Int? @default(1)
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  // --- MỚI: Giới hạn phạm vi áp dụng ---
+
+  // 3. Phạm vi áp dụng (Nếu cả 3 mảng này đều rỗng, nghĩa là áp dụng cho TOÀN BỘ ĐƠN HÀNG)
+  applicableProducts   CouponApplicableProduct[]
+  applicableCategories CouponApplicableCategory[]
+  excludedProducts     CouponExcludedProduct[]
+  excludedCategories   CouponExcludedCategory[]
+
+  // 4. Liên kết với các đơn hàng đã sử dụng (Để theo dõi)
+  orders Order[] // Thêm trường này vào model Order
+
+  @@map("coupon")
+}
+
+enum CouponType {
+  PERCENT // Giảm theo %
+  FIXED // Giảm số tiền cố định (trên tổng đơn hoặc trên sản phẩm)
+  FREE_SHIPPING // Miễn phí vận chuyển
+}
+
+// =================================================================
+// CÁC BẢNG TRUNG GIAN MỚI CHO COUPON (Quan hệ N-N)
+// =================================================================
+
+// Bảng N-N: Các sản phẩm ĐƯỢC ÁP DỤNG coupon
+model CouponApplicableProduct {
+  couponId  String
+  coupon    Coupon  @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, productId])
+  @@map("coupon_applicable_product")
+}
+
+// Bảng N-N: Các danh mục ĐƯỢC ÁP DỤNG coupon
+model CouponApplicableCategory {
+  couponId   String
+  coupon     Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, categoryId])
+  @@map("coupon_applicable_category")
+}
+
+// Bảng N-N: Các sản phẩm BỊ LOẠI TRỪ khỏi coupon
+model CouponExcludedProduct {
+  couponId  String
+  coupon    Coupon  @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, productId])
+  @@map("coupon_excluded_product")
+}
+
+// Bảng N-N: Các danh mục BỊ LOẠI TRỪ khỏi coupon
+model CouponExcludedCategory {
+  couponId   String
+  coupon     Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, categoryId])
+  @@map("coupon_excluded_category")
+}
+
+model WishlistItem {
+  id     String @id @default(cuid())
+  userId String // Khóa ngoại String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId]) // Mỗi user chỉ thêm 1 sản phẩm vào wishlist 1 lần
+  @@map("wishlist_item")
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  // Admin/Staff thực hiện hành động
+  userId String? // Khóa ngoại String
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action    String // VD: "UPDATE_PRODUCT", "CANCEL_ORDER"
+  entity    String // Tên bảng: "Product", "Order"
+  entityId  String? // ID của đối tượng
+  message   String   @db.Text
+  metadata  Json? // Dữ liệu chi tiết (VD: old_value, new_value)
+  createdAt DateTime @default(now())
+
+  @@map("audit_log")
+}
+
+// Quản lý CMS (Trang tĩnh, Banner)
+model StaticPage {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  content   String   @db.Text
+  active    Boolean  @default(true)
+  seoTitle  String?
+  seoDesc   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("static_page")
+}
+
+model Banner {
+  id        String   @id @default(cuid())
+  title     String
+  imageUrl  String
+  linkUrl   String? // Đường dẫn khi click vào banner
+  position  String // Vị trí (VD: "homepage_slider", "sidebar_ad")
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("banner")
 }

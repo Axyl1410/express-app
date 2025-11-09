@@ -1,9 +1,11 @@
+import { apiReference } from "@scalar/express-api-reference";
+import { toNodeHandler } from "better-auth/node";
 import cors from "cors";
 import express, { type Request, type Response } from "express";
 import { sendSuccess } from "@/lib/api-response-helper";
+import { auth } from "./lib/auth";
 import logMiddleware from "./middleware/log.middleware";
 import v1 from "./routes/v1";
-import v2 from "./routes/v2";
 
 const corsOptions = {
 	origin: "*",
@@ -14,11 +16,24 @@ const corsOptions = {
 export const CreateServer = () => {
 	const app = express();
 
+	app.all("/api/auth/*splat", toNodeHandler(auth));
+
 	app
 		.use(cors(corsOptions))
 		.use(express.json())
 		.use(express.urlencoded({ extended: true }))
 		.use(logMiddleware);
+
+	app.get(
+		"/docs",
+		apiReference({
+			pageTitle: "API Documentation",
+			sources: [
+				// Better Auth schema generation endpoint
+				{ url: "/api/auth/open-api/generate-schema", title: "Auth" },
+			],
+		})
+	);
 
 	app.get("/", (_req: Request, res: Response) => {
 		sendSuccess(res, { message: "Hello, World!" }, "Welcome to API");
@@ -34,8 +49,7 @@ export const CreateServer = () => {
 
 	app.use(express.static("public"));
 
-	app.use("/v1", v1);
-	app.use("/v2", v2);
+	app.use("/api/v1", v1);
 
 	return app;
 };
