@@ -1,5 +1,6 @@
 import { fromNodeHeaders } from "better-auth/node";
 import type { NextFunction, Request, Response } from "express";
+import { sendError } from "@/lib/api-response-helper";
 import { auth } from "@/lib/auth";
 import logger from "@/lib/logger";
 
@@ -23,9 +24,7 @@ const AuthMiddleware = async (
         "Unauthorized: Invalid or expired token"
       );
 
-      return res
-        .status(401)
-        .json({ message: "Unauthorized: Invalid or expired token" });
+      return sendError(res, "Unauthorized: Invalid or expired token", 401);
     }
 
     // Attach session and user to request for downstream use
@@ -44,9 +43,7 @@ const AuthMiddleware = async (
       "Authentication error"
     );
 
-    return res
-      .status(500)
-      .json({ message: "Internal server error during authentication" });
+    return sendError(res, "Internal server error during authentication", 500);
   }
 };
 
