@@ -15,11 +15,7 @@ v1.get("/ping", (_req: Request, res: Response) => {
 });
 
 v1.get("/me", AuthMiddleware, (req, res) => {
-  sendSuccess(
-    res,
-    { session: req.session?.session, user: req.session?.user },
-    "User session"
-  );
+  sendSuccess(res, { session: req.session }, "User session");
 });
 
 export default v1;

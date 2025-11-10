@@ -28,8 +28,10 @@ const AuthMiddleware = async (
     }
 
     // Attach session and user to request for downstream use
-    req.session = session;
-    req.user = session.user;
+    req.session = {
+      session: session.session,
+      user: session.user,
+    };
 
     next();
   } catch (error) {
