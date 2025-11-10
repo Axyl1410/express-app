@@ -1,36 +1,53 @@
+import { fromNodeHeaders } from "better-auth/node";
 import type { NextFunction, Request, Response } from "express";
+import { auth } from "@/lib/auth";
 import logger from "@/lib/logger";
-import prisma from "@/lib/prisma";
 
 const AuthMiddleware = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  const token = req.headers["x-auth-token"];
+  try {
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
 
-  const session = await prisma.session.findFirst({
-    where: {
-      token: token as string,
-    },
-  });
+    if (!session) {
+      logger.warn(
+        {
+          path: req.path,
+          method: req.method,
+          ip: req.ip,
+        },
+        "Unauthorized: Invalid or expired token"
+      );
 
-  if (!session) {
-    logger.warn(
+      return res
+        .status(401)
+        .json({ message: "Unauthorized: Invalid or expired token" });
+    }
+
+    // Attach session and user to request for downstream use
+    req.session = session;
+    req.user = session.user;
+
+    next();
+  } catch (error) {
+    logger.error(
       {
         path: req.path,
         method: req.method,
         ip: req.ip,
-        hasToken: !!token,
+        error: error instanceof Error ? error.message : String(error),
       },
-      "Unauthorized: Invalid or expired token"
+      "Authentication error"
     );
-    return res
-      .status(401)
-      .json({ message: "Unauthorized: Invalid or expired token" });
-  }
 
-  next();
+    return res
+      .status(500)
+      .json({ message: "Internal server error during authentication" });
+  }
 };
 
 export default AuthMiddleware;
