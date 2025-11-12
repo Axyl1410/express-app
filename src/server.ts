@@ -4,6 +4,7 @@ import cors from "cors";
 import express, { type Request, type Response } from "express";
 import { sendSuccess } from "@/lib/api-response-helper";
 import { auth } from "./lib/auth";
+import errorMiddleware from "./middleware/error.middleware";
 import logMiddleware from "./middleware/log.middleware";
 
 import v1 from "./routes/v1";
@@ -51,6 +52,9 @@ export const CreateServer = () => {
   app.use(express.static("public"));
 
   app.use("/api/v1", v1);
+
+  // Error handling middleware must be last
+  app.use(errorMiddleware);
 
   return app;
 };

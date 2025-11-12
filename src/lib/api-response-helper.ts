@@ -172,6 +172,7 @@ type AsyncRequestHandler = (
 /**
  * Wrapper to automatically handle async errors
  * Use to wrap async route handlers
+ * Errors are passed to the error middleware via next()
  *
  * @example
  * router.get('/users', asyncHandler(async (req, res) => {
@@ -182,7 +183,8 @@ type AsyncRequestHandler = (
 export function asyncHandler(fn: AsyncRequestHandler) {
   return (req: Request, res: Response, next: NextFunction): void => {
     Promise.resolve(fn(req, res, next)).catch((error) => {
-      sendErrorFromException(res, error, 500);
+      // Pass error to error middleware
+      next(error);
     });
   };
 }
