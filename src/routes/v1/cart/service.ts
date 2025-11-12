@@ -204,20 +204,91 @@ export async function getOrCreateCart(
 }
 
 /**
- * Get cart by ID with items
+ * Validate cart items on read
+ * Rule: Validation on Read - Check stock, price, and product status
+ */
+type CartItemValidation = {
+  itemId: string;
+  variantId: string;
+  issues: Array<{
+    type: "stock" | "price" | "status";
+    message: string;
+  }>;
+};
+
+/**
+ * Validate a single cart item
+ */
+function validateCartItem(item: {
+  id: string;
+  variantId: string;
+  quantity: number;
+  priceAtAdd: unknown;
+  variant: {
+    stockQuantity: number;
+    price: unknown;
+    salePrice: unknown | null;
+    product: {
+      status: string;
+    };
+  };
+}): CartItemValidation | null {
+  const issues: CartItemValidation["issues"] = [];
+
+  // Check product status
+  if (item.variant.product.status !== "PUBLISHED") {
+    issues.push({
+      type: "status",
+      message: `Product is not available (status: ${item.variant.product.status})`,
+    });
+  }
+
+  // Check stock quantity
+  if (item.quantity > item.variant.stockQuantity) {
+    issues.push({
+      type: "stock",
+      message: `Insufficient stock. Only ${item.variant.stockQuantity} items available, but cart has ${item.quantity}.`,
+    });
+  }
+
+  // Check price (compare snapshot with current price)
+  const currentPrice = Number(item.variant.salePrice || item.variant.price);
+  const snapshotPrice = Number(item.priceAtAdd);
+  const priceDiff = Math.abs(currentPrice - snapshotPrice);
+
+  // If price difference is significant (more than 1% or 1000 VND)
+  if (priceDiff > 0.01 * snapshotPrice || priceDiff > 1000) {
+    issues.push({
+      type: "price",
+      message: `Price has changed from ${snapshotPrice.toLocaleString()} to ${currentPrice.toLocaleString()}`,
+    });
+  }
+
+  if (issues.length === 0) {
+    return null;
+  }
+
+  return {
+    itemId: item.id,
+    variantId: item.variantId,
+    issues,
+  };
+}
+
+/**
+ * Get cart by ID with items and validation
+ * Rule: Validation on Read - Validates stock, price, and product status
  */
 export async function getCartById(cartId: string): Promise<
   | (CartType & {
       items: CartItemType[];
+      validation?: {
+        warnings: CartItemValidation[];
+        errors: CartItemValidation[];
+      };
     })
   | null
 > {
-  const cacheKey = `cart:${cartId}`;
-  const cached = await getCache<CartType & { items: CartItemType[] }>(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
   const cart = await prisma.cart.findUnique({
     where: { id: cartId },
     include: {
@@ -231,6 +302,7 @@ export async function getCartById(cartId: string): Promise<
                   name: true,
                   slug: true,
                   defaultImage: true,
+                  status: true,
                 },
               },
             },
@@ -245,6 +317,27 @@ export async function getCartById(cartId: string): Promise<
     return null;
   }
 
+  // Rule: Validation on Read
+  const validationWarnings: CartItemValidation[] = [];
+  const validationErrors: CartItemValidation[] = [];
+
+  for (const item of cart.items) {
+    const validation = validateCartItem(item);
+    if (!validation) {
+      continue;
+    }
+
+    // Status and stock issues are errors, price is warning
+    const hasError = validation.issues.some(
+      (i) => i.type === "status" || i.type === "stock"
+    );
+    if (hasError) {
+      validationErrors.push(validation);
+    } else {
+      validationWarnings.push(validation);
+    }
+  }
+
   // Transform to match CartItemType
   const transformedCart = {
     ...cart,
@@ -256,28 +349,56 @@ export async function getCartById(cartId: string): Promise<
       priceAtAdd: Number(item.priceAtAdd),
       createdAt: item.createdAt,
     })),
+    ...(validationWarnings.length > 0 || validationErrors.length > 0
+      ? {
+          validation: {
+            warnings: validationWarnings,
+            errors: validationErrors,
+          },
+        }
+      : {}),
   };
 
-  await setCache(cacheKey, transformedCart, 300);
+  // Only cache if no validation errors
+  const cacheKey = `cart:${cartId}`;
+  if (validationErrors.length === 0) {
+    await setCache(cacheKey, transformedCart, 300);
+  }
 
   return transformedCart;
 }
 
 /**
  * Add item to cart
+ * Rule: Stock Check, Merge Quantity, Price Snapshot
  */
 export async function addItemToCart(
   cartId: string,
   variantId: string,
   quantity: number
 ): Promise<CartItemType> {
-  // Get variant to get current price
+  // Get variant with product to check stock and status
   const variant = await prisma.productVariant.findUnique({
     where: { id: variantId },
+    include: {
+      product: {
+        select: {
+          id: true,
+          status: true,
+        },
+      },
+    },
   });
 
   if (!variant) {
     throw new Error("Product variant not found");
+  }
+
+  // Rule: Validation on Read - Check product status
+  if (variant.product.status !== "PUBLISHED") {
+    throw new Error(
+      `Product is not available (status: ${variant.product.status})`
+    );
   }
 
   // Check if item already exists in cart
@@ -288,15 +409,30 @@ export async function addItemToCart(
     },
   });
 
+  // Calculate new quantity (Rule: Merge Quantity)
+  const newQuantity = existingItem
+    ? existingItem.quantity + quantity
+    : quantity;
+
+  // Rule: Stock Check - Validate stock quantity
+  if (newQuantity > variant.stockQuantity) {
+    throw new Error(
+      `Insufficient stock. Only ${variant.stockQuantity} items available in stock.`
+    );
+  }
+
+  // Rule: Price Snapshot - Use salePrice if available, otherwise use price
+  const currentPrice = variant.salePrice || variant.price;
+
   let cartItem: CartItemType;
 
   if (existingItem) {
-    // Update quantity
+    // Rule: Merge Quantity - Update existing item
     const updated = await prisma.cartItem.update({
       where: { id: existingItem.id },
       data: {
-        quantity: existingItem.quantity + quantity,
-        priceAtAdd: variant.price, // Update price to current price
+        quantity: newQuantity,
+        priceAtAdd: currentPrice, // Snapshot current price
       },
     });
 
@@ -315,7 +451,7 @@ export async function addItemToCart(
         cartId,
         variantId,
         quantity,
-        priceAtAdd: variant.price,
+        priceAtAdd: currentPrice, // Snapshot current price
       },
     });
 
@@ -348,6 +484,7 @@ export async function addItemToCart(
 
 /**
  * Update cart item quantity
+ * Rule: Stock Check
  */
 export async function updateCartItem(
   itemId: string,
@@ -357,12 +494,47 @@ export async function updateCartItem(
     throw new Error("Quantity must be greater than 0");
   }
 
+  // Get cart item with variant to check stock
+  const cartItem = await prisma.cartItem.findUnique({
+    where: { id: itemId },
+    include: {
+      variant: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              status: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!cartItem) {
+    throw new Error("Cart item not found");
+  }
+
+  // Rule: Validation on Read - Check product status
+  if (cartItem.variant.product.status !== "PUBLISHED") {
+    throw new Error(
+      `Product is not available (status: ${cartItem.variant.product.status})`
+    );
+  }
+
+  // Rule: Stock Check - Validate stock quantity
+  if (quantity > cartItem.variant.stockQuantity) {
+    throw new Error(
+      `Insufficient stock. Only ${cartItem.variant.stockQuantity} items available in stock.`
+    );
+  }
+
   const updated = await prisma.cartItem.update({
     where: { id: itemId },
     data: { quantity },
   });
 
-  const cartItem: CartItemType = {
+  const result: CartItemType = {
     id: updated.id,
     cartId: updated.cartId,
     variantId: updated.variantId,
@@ -385,7 +557,7 @@ export async function updateCartItem(
     }
   }
 
-  return cartItem;
+  return result;
 }
 
 /**
