@@ -4,7 +4,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "build": "pnpm exec tsc && pnpm exec tsc-alias -f -fe .js",
+    "build": "tsc && tsc-alias -f -fe .js",
     "start": "node dist/index.js",
     "dev": "nodemon",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -26,9 +26,12 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "pino": "^10.1.0",
+    "prisma": "^6.16.1",
     "redis": "^5.9.0",
     "resend": "^6.4.2",
     "socket.io": "^4.8.1",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.9.2",
     "zod": "^4.1.12"
   },
   "devDependencies": {
@@ -41,12 +44,9 @@
     "husky": "^9.1.7",
     "lefthook": "^2.0.2",
     "nodemon": "^3.1.10",
-    "prisma": "^6.16.1",
     "ts-node": "^10.9.2",
-    "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.2",
     "ultracite": "6.3.2"
   },
   "packageManager": "pnpm@10.12.4+sha512.5ea8b0deed94ed68691c9bad4c955492705c5eeb8a87ef86bc62c74a26b037b08ff9570f108b2e4dbd1dd1a9186fea925e527f141c648e85af45631074680184",
