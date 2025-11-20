@@ -1,2 +1,2 @@
-web: node src/index.ts
+web: node dist/index.js
 release: pnpm build && pnpm prisma generate
