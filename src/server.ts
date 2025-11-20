@@ -33,7 +33,7 @@ export const CreateServer = () => {
       sources: [
         // Better Auth schema generation endpoint
         { url: "/api/auth/open-api/generate-schema", title: "Auth" },
-      ],
+      ]
     })
   );
 

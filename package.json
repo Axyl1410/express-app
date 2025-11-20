@@ -17,7 +17,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@prisma/client": "^6.16.1",
+    "@prisma/client": "^7.0.0",
     "@react-email/components": "^1.0.0",
     "@scalar/express-api-reference": "^0.8.24",
     "@types/cors": "^2.8.19",
@@ -30,7 +30,7 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "pino": "^10.1.0",
-    "prisma": "^6.16.1",
+    "prisma": "^7.0.0",
     "react": "^19.0.0",
     "redis": "^5.9.0",
     "resend": "^6.4.2",
