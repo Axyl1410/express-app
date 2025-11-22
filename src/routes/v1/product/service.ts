@@ -1,25 +1,20 @@
 import { deleteCache, getCache, setCache } from "@/lib/cache.helper";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-import { ProductStatus } from "@/types/enums";
 import type {
+  BuildListCacheKeyParams,
   CreateProductInput,
+  GetProductsParams,
   ProductDetailType,
   ProductListResponseType,
+  ProductWhereClause,
   UpdateProductInput,
 } from "@/types/product";
 
 /**
  * Build cache key for product list
  */
-function buildListCacheKey(params: {
-  page?: number;
-  limit?: number;
-  status?: string;
-  categoryId?: string;
-  brandId?: string;
-  search?: string;
-}): string {
+function buildListCacheKey(params: BuildListCacheKeyParams): string {
   const { page = 1, limit = 10, status, categoryId, brandId, search } = params;
   const parts = [
     "product:list",
@@ -47,16 +42,9 @@ function invalidateProductCache(): void {
 /**
  * Get products with pagination, filtering, and sorting
  */
-export async function getProducts(params: {
-  page?: number;
-  limit?: number;
-  status?: ProductStatus;
-  categoryId?: string;
-  brandId?: string;
-  search?: string;
-  sortBy?: "name" | "createdAt" | "updatedAt";
-  sortOrder?: "asc" | "desc";
-}): Promise<ProductListResponseType> {
+export async function getProducts(
+  params: GetProductsParams
+): Promise<ProductListResponseType> {
   const {
     page = 1,
     limit = 10,
@@ -86,15 +74,7 @@ export async function getProducts(params: {
   }
 
   // Build where clause
-  const where: {
-    status?: ProductStatus;
-    categoryId?: string;
-    brandId?: string;
-    OR?: Array<{
-      name?: { contains: string; mode: "insensitive" };
-      description?: { contains: string; mode: "insensitive" };
-    }>;
-  } = {};
+  const where: ProductWhereClause = {};
 
   if (status) {
     where.status = status;

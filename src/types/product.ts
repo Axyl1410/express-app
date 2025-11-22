@@ -99,3 +99,44 @@ export type UpdateProductInput = {
   seoMetaDesc?: string | null;
   status?: ProductStatus;
 };
+
+// Service-level types for product operations
+
+/**
+ * Parameters for building product list cache key
+ */
+export type BuildListCacheKeyParams = {
+  page?: number;
+  limit?: number;
+  status?: string;
+  categoryId?: string;
+  brandId?: string;
+  search?: string;
+};
+
+/**
+ * Parameters for getting products list
+ */
+export type GetProductsParams = {
+  page?: number;
+  limit?: number;
+  status?: ProductStatus;
+  categoryId?: string;
+  brandId?: string;
+  search?: string;
+  sortBy?: "name" | "createdAt" | "updatedAt";
+  sortOrder?: "asc" | "desc";
+};
+
+/**
+ * Where clause for product queries
+ */
+export type ProductWhereClause = {
+  status?: ProductStatus;
+  categoryId?: string;
+  brandId?: string;
+  OR?: Array<{
+    name?: { contains: string; mode: "insensitive" };
+    description?: { contains: string; mode: "insensitive" };
+  }>;
+};
