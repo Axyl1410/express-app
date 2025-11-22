@@ -5,7 +5,7 @@ import {
   sendResetPasswordEmail,
   sendVerificationEmail,
 } from "@/services/email.service";
-import prisma from "./prisma";
+import { prisma } from "./prisma";
 import { assertValue } from "./utils";
 
 export const auth = betterAuth({

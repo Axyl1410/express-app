@@ -1,6 +1,6 @@
 import { deleteCache, getCache, setCache } from "@/lib/cache.helper";
 import logger from "@/lib/logger";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import type { CartItemType, CartType } from "@/types/cart";
 
 /**
